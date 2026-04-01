@@ -8,7 +8,7 @@ which provides a "backdoor" for reminder data management.
 # --------------------------------------------------------------------------------
 
 from app.utils.auth import get_storage_for_api
-from app.utils.storage import ReminderList, ReminderItem, ReminderStorage
+from app.utils.mysql_storage import MySQLStorage, ReminderList, ReminderItem
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -51,7 +51,7 @@ class SelectedListId(BaseModel):
   response_model=List[ReminderList]
 )
 async def get_reminders(
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> list[ReminderList]:
   """Gets the list of all reminder lists owned by the user."""
 
@@ -65,7 +65,7 @@ async def get_reminders(
 )
 async def post_reminders(
   reminder_list: NewReminderListName,
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> ReminderList:
   """Creates a new reminder list for the user."""
 
@@ -80,7 +80,7 @@ async def post_reminders(
 )
 async def get_list_id(
   list_id: int,
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> ReminderList:
   """Gets a reminder list by ID."""
 
@@ -95,7 +95,7 @@ async def get_list_id(
 async def patch_list_id(
   list_id: int,
   reminder_list: NewReminderListName,
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> ReminderList:
   """Updates a reminder list's name."""
   
@@ -110,7 +110,7 @@ async def patch_list_id(
 )
 async def delete_list_id(
   list_id: int,
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> Dict:
   """Deletes a reminder list by ID."""
 
@@ -129,7 +129,7 @@ async def delete_list_id(
 )
 async def get_list_id_items(
   list_id: int,
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> List[ReminderItem]:
   """Gets all reminder items for a list."""
 
@@ -144,7 +144,7 @@ async def get_list_id_items(
 async def post_reminders_list_id_items(
   list_id: int,
   reminder_item: NewReminderItem,
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> ReminderItem:
   """Adds a new item to a reminder list."""
 
@@ -159,7 +159,7 @@ async def post_reminders_list_id_items(
 )
 async def get_items_item_id(
   item_id: int,
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> ReminderItem:
   """Gets a reminder item by ID."""
 
@@ -174,7 +174,7 @@ async def get_items_item_id(
 async def patch_items_item_id(
   item_id: int,
   reminder_item: NewReminderItem,
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> ReminderItem:
   """Updates a reminder item's description."""
   
@@ -189,7 +189,7 @@ async def patch_items_item_id(
 )
 async def patch_items_strike_item_id(
   item_id: int,
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> ReminderItem:
   """Toggles the completed status of a reminder item."""
   
@@ -204,7 +204,7 @@ async def patch_items_strike_item_id(
 )
 async def delete_items_item_id(
   item_id: int,
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> Dict:
   """Deletes a reminder item by ID."""
 
@@ -222,7 +222,7 @@ async def delete_items_item_id(
   response_model=SelectedListId
 )
 async def get_selected(
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> SelectedListId:
   """Gets the selected reminder list."""
 
@@ -237,7 +237,7 @@ async def get_selected(
 )
 async def post_select_list_id(
   list_id: int,
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> Dict:
   """Selects a reminder list."""
 
@@ -251,7 +251,7 @@ async def post_select_list_id(
   response_model=Dict
 )
 async def post_unselect(
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> Dict:
   """Unselects any reminder list."""
 
@@ -269,7 +269,7 @@ async def post_unselect(
   response_model=Dict
 )
 async def delete_delete_lists(
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> Dict:
   """Deletes all the user's reminder lists."""
 
@@ -283,7 +283,7 @@ async def delete_delete_lists(
   response_model=Dict
 )
 async def post_create_new_lists(
-  storage: ReminderStorage = Depends(get_storage_for_api)
+  storage: MySQLStorage = Depends(get_storage_for_api)
 ) -> Dict:
   """Creates an entirely new set of reminders after deleting old reminders."""
 

@@ -9,7 +9,7 @@ It uses:
 * [FastAPI](https://fastapi.tiangolo.com/) for the backend
 * [HTMX](https://htmx.org/) 1.8.6 for handling dynamic interactions (instead of raw JavaScript)
 * [Jinja templates](https://jinja.palletsprojects.com/en/3.1.x/) with HTML and CSS for the frontend
-* [TinyDB](https://tinydb.readthedocs.io/en/latest/index.html) for the database
+* [MariaDB](https://wiki.alpinelinux.org/wiki/MariaDB) for the database
 * [Playwright](https://playwright.dev/python/) and [pytest](https://docs.pytest.org/) for testing
 
 ## Installing dependencies
@@ -24,6 +24,24 @@ pip install -r requirements.txt
 It is recommended to install dependencies into a [virtual environment](https://docs.python.org/3/library/venv.html).
 
 
+## Setting up the database
+
+This application requires a MySQL database. The connection details are configured in the `config.json` file.
+
+Example `db_config` in `config.json`:
+```json
+{
+  "db_config": {
+    "host": "localhost",
+    "port": 3306,
+    "user": "root",
+    "password": "mypass",
+    "database": "catty_reminders"
+  }
+}
+```
+The application will attempt to create the database specified in the configuration if it does not exist. The user specified in the configuration must have the necessary privileges to create a database.
+
 ## Running the app
 
 Prepare environment variables from template and export it:
@@ -33,7 +51,7 @@ cp .env.example .env
 set -a; source .env; set +a
 ```
 
-To run the app:
+Once the database is configured, you can run the app:
 
 ```
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8181
@@ -47,13 +65,6 @@ Then, open your browser to [`http://127.0.0.1:8181`](http://127.0.0.1:8181) to l
 
 The [`config.json`](config.json) file declares the users for the app.
 You may use any configured user credentials, or change them to your liking.
-
-## Setting the database path
-
-The app uses TinyDB, which stores the database as a JSON file.
-The default database filepath is `reminder_db.json`.
-You may change this path in [`config.json`](config.json).
-If you change the filepath, the app will automatically create a new, empty database.
 
 
 ## Using the app

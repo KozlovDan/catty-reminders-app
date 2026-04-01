@@ -9,9 +9,9 @@ This module provides security and authentication.
 import jwt
 import secrets
 
-from app import db_path, users, secret_key
+from app import users, secret_key, db_config
 from app.utils.exceptions import UnauthorizedException, UnauthorizedPageException
-from app.utils.storage import ReminderStorage
+from app.utils.mysql_storage import MySQLStorage
 
 from fastapi import Cookie, Depends, Form
 from fastapi.security import HTTPBasic
@@ -99,9 +99,9 @@ def get_username_for_page(cookie: Optional[AuthCookie] = Depends(get_auth_cookie
   return cookie.username
 
 
-def get_storage_for_api(username: str = Depends(get_username_for_api)) -> ReminderStorage:
-  return ReminderStorage(owner=username, db_path=db_path)
+def get_storage_for_api(username: str = Depends(get_username_for_api)) -> MySQLStorage:
+  return MySQLStorage(owner=username, db_config=db_config)
 
 
-def get_storage_for_page(username: str = Depends(get_username_for_page)) -> ReminderStorage:
-  return ReminderStorage(owner=username, db_path=db_path)
+def get_storage_for_page(username: str = Depends(get_username_for_page)) -> MySQLStorage:
+  return MySQLStorage(owner=username, db_config=db_config)

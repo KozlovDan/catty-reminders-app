@@ -8,7 +8,7 @@ This module provides routes for the reminders pages.
 
 from app import templates
 from app.utils.auth import get_storage_for_page
-from app.utils.storage import ReminderStorage
+from app.utils.mysql_storage import MySQLStorage
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/reminders")
 # Helpers
 # --------------------------------------------------------------------------------
 
-def _build_full_page_context(request: Request, storage: ReminderStorage):
+def _build_full_page_context(request: Request, storage: MySQLStorage):
   reminder_lists = storage.get_lists()
   selected_list = storage.get_selected_list()
 
@@ -36,7 +36,7 @@ def _build_full_page_context(request: Request, storage: ReminderStorage):
     'selected_list': selected_list}
 
 
-def _get_reminders_grid(request: Request, storage: ReminderStorage):
+def _get_reminders_grid(request: Request, storage: MySQLStorage):
   context = _build_full_page_context(request, storage)
   return templates.TemplateResponse("partials/reminders/content.html", context)
 
@@ -53,7 +53,7 @@ def _get_reminders_grid(request: Request, storage: ReminderStorage):
 )
 async def get_reminders(
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page)
+  storage: MySQLStorage = Depends(get_storage_for_page)
 ):
   context = _build_full_page_context(request, storage)
   return templates.TemplateResponse("pages/reminders.html", context)
@@ -72,9 +72,9 @@ async def get_reminders(
 async def get_reminders_list_row(
   list_id: int,
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page)
+  storage: MySQLStorage = Depends(get_storage_for_page)
 ):
-  reminder_list = storage.get_list(list_id)
+  reminder__list = storage.get_list(list_id)
   selected_list = storage.get_selected_list()
   context = {'request': request, 'reminder_list': reminder_list, 'selected_list': selected_list}
   return templates.TemplateResponse("partials/reminders/list-row.html", context)
@@ -89,7 +89,7 @@ async def get_reminders_list_row(
 async def delete_reminders_list_row(
   list_id: int,
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page)
+  storage: MySQLStorage = Depends(get_storage_for_page)
 ):
   storage.delete_list(list_id)
   storage.reset_selected_after_delete(list_id)
@@ -105,7 +105,7 @@ async def delete_reminders_list_row(
 async def patch_reminders_list_row_name(
   list_id: int,
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page),
+  storage: MySQLStorage = Depends(get_storage_for_page),
   new_name: str = Form()
 ):
   storage.update_list_name(list_id, new_name)
@@ -122,7 +122,7 @@ async def patch_reminders_list_row_name(
 async def get_reminders_list_row_edit(
   list_id: int,
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page)
+  storage: MySQLStorage = Depends(get_storage_for_page)
 ):
   reminder_list = storage.get_list(list_id)
   selected_list = storage.get_selected_list()
@@ -138,7 +138,7 @@ async def get_reminders_list_row_edit(
 )
 async def get_reminders_new_list_row(
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page)
+  storage: MySQLStorage = Depends(get_storage_for_page)
 ):
   context = {'request': request}
   return templates.TemplateResponse("partials/reminders/new-list-row.html", context)
@@ -152,7 +152,7 @@ async def get_reminders_new_list_row(
 )
 async def post_reminders_new_list_row(
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page),
+  storage: MySQLStorage = Depends(get_storage_for_page),
   reminder_list_name: str = Form()
 ):
   list_id = storage.create_list(reminder_list_name)
@@ -168,7 +168,7 @@ async def post_reminders_new_list_row(
 )
 async def get_reminders_new_list_row_edit(
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page)
+  storage: MySQLStorage = Depends(get_storage_for_page)
 ):
   context = {'request': request}
   return templates.TemplateResponse("partials/reminders/new-list-row-edit.html", context)
@@ -183,7 +183,7 @@ async def get_reminders_new_list_row_edit(
 async def post_reminders_select(
   list_id: int,
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page)
+  storage: MySQLStorage = Depends(get_storage_for_page)
 ):
   storage.set_selected_list(list_id)
   return _get_reminders_grid(request, storage)
@@ -202,7 +202,7 @@ async def post_reminders_select(
 async def get_reminders_item_row(
   item_id: int,
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page)
+  storage: MySQLStorage = Depends(get_storage_for_page)
 ):
   reminder_item = storage.get_item(item_id)
   context = {'request': request, 'reminder_item': reminder_item}
@@ -217,7 +217,7 @@ async def get_reminders_item_row(
 )
 async def delete_reminders_item_row(
   item_id: int,
-  storage: ReminderStorage = Depends(get_storage_for_page)
+  storage: MySQLStorage = Depends(get_storage_for_page)
 ):
   storage.delete_item(item_id)
   return ""
@@ -232,7 +232,7 @@ async def delete_reminders_item_row(
 async def patch_reminders_item_row_description(
   item_id: int,
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page),
+  storage: MySQLStorage = Depends(get_storage_for_page),
   new_description: str = Form()
 ):
   storage.update_item_description(item_id, new_description)
@@ -250,7 +250,7 @@ async def patch_reminders_item_row_description(
 async def patch_reminders_item_row_strike(
   item_id: int,
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page)
+  storage: MySQLStorage = Depends(get_storage_for_page)
 ):
   storage.strike_item(item_id)
   reminder_item = storage.get_item(item_id)
@@ -267,7 +267,7 @@ async def patch_reminders_item_row_strike(
 async def get_reminders_item_row_edit(
   item_id: int,
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page)
+  storage: MySQLStorage = Depends(get_storage_for_page)
 ):
   reminder_item = storage.get_item(item_id)
   context = {'request': request, 'reminder_item': reminder_item}
@@ -282,7 +282,7 @@ async def get_reminders_item_row_edit(
 )
 async def get_reminders_new_item_row(
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page)
+  storage: MySQLStorage = Depends(get_storage_for_page)
 ):
   context = {'request': request}
   return templates.TemplateResponse("partials/reminders/new-item-row.html", context)
@@ -296,7 +296,7 @@ async def get_reminders_new_item_row(
 )
 async def post_reminders_new_item_row(
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page),
+  storage: MySQLStorage = Depends(get_storage_for_page),
   reminder_item_name: str = Form()
 ):
   selected_list = storage.get_selected_list()
@@ -312,7 +312,7 @@ async def post_reminders_new_item_row(
 )
 async def get_reminders_new_item_row_edit(
   request: Request,
-  storage: ReminderStorage = Depends(get_storage_for_page)
+  storage: MySQLStorage = Depends(get_storage_for_page)
 ):
   context = {'request': request}
   return templates.TemplateResponse("partials/reminders/new-item-row-edit.html", context)
