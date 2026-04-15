@@ -219,6 +219,11 @@
       "login": "Demonstinatord",
       "id": "sergienko",
       "app": "catty-reminders-app"
+    },
+    {
+      "login": "vissstu",
+      "id": "chernikova",
+      "app": "catty-reminders-app"
     }
   ]
 }
