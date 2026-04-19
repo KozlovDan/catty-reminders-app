@@ -224,6 +224,12 @@
       "login": "vissstu",
       "id": "chernikova",
       "app": "catty-reminders-app"
+    },
+	{
+      "login": "KozlovDan",
+      "id": "kozlov",
+      "app": "catty-reminders-app"
     }
+	
   ]
 }
