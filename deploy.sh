@@ -1,10 +1,12 @@
 #!/bin/bash
 
-cd /home/danila/devops/app || exit
-
 echo "Deploy started"
 
-git pull origin main
+cd /home/danila/devops/app || exit
+
+git pull --rebase origin lab1
+
+echo "DEPLOY_REF=$(git rev-parse HEAD)" > .env
 
 sudo systemctl restart app
 
