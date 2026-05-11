@@ -1,0 +1,24 @@
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  rerun_pr_tests:
+    permissions: write-all
+    name: rerun_pr_tests
+    if: ${{ github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Extract user logins
+        id: extract_logins
+        run: |
+          LOGINS=$(jq -r '.users[].login' params.json | paste -sd "," -)
+          echo "logins=$LOGINS" >> "$GITHUB_OUTPUT"
+
+      - uses: prafdin/rerun-actions@main
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          comment_id: ${{ github.event.comment.id }}
+          allowed_users: ${{ steps.extract_logins.outputs.logins }}
