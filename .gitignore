@@ -4,3 +4,4 @@ __pycache__/
 *.py[cod]
 deploy/frpc.local.toml
 deploy/webhook.env
+deploy/webhook.home.env

@@ -50,9 +50,22 @@ git -C "$APP_DIR" fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
 git -C "$APP_DIR" checkout -B "$BRANCH" "origin/$BRANCH"
 git -C "$APP_DIR" reset --hard "origin/$BRANCH"
 
+# GitHub sends the exact post-receive commit in "after". CI compares deployref to that SHA.
+# origin/$BRANCH can rarely lag "after" right after fetch; align when the object is available.
+if [[ -n "$REQUESTED_SHA" ]]; then
+  if ! git -C "$APP_DIR" cat-file -e "$REQUESTED_SHA^{commit}" 2>/dev/null; then
+    git -C "$APP_DIR" fetch origin "refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}" 2>/dev/null || true
+  fi
+  if git -C "$APP_DIR" cat-file -e "$REQUESTED_SHA^{commit}" 2>/dev/null; then
+    git -C "$APP_DIR" reset --hard "$REQUESTED_SHA"
+  else
+    echo "WARNING: requested SHA $REQUESTED_SHA not in repo after fetch; using $(git -C "$APP_DIR" rev-parse HEAD)" >&2
+  fi
+fi
+
 DEPLOYED_SHA="$(git -C "$APP_DIR" rev-parse HEAD)"
 if [[ -n "$REQUESTED_SHA" && "$DEPLOYED_SHA" != "$REQUESTED_SHA" ]]; then
-  echo "Requested SHA $REQUESTED_SHA, deploying latest branch SHA $DEPLOYED_SHA"
+  echo "WARNING: deployed HEAD $DEPLOYED_SHA still differs from webhook after=$REQUESTED_SHA" >&2
 fi
 
 if [[ ! -x "$APP_DIR/.venv/bin/python" ]]; then
