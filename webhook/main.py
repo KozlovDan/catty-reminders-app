@@ -68,11 +68,16 @@ def _verify_signature(body: bytes, signature: Optional[str]) -> None:
     raise HTTPException(status_code=401, detail="Invalid GitHub signature")
 
 
-def _branch_from_ref(ref: str) -> str:
-  prefix = "refs/heads/"
-  if not ref.startswith(prefix):
+def _branch_name_from_ref(ref: str) -> str:
+  """Push uses refs/heads/<name>. Create-branch sends bare <name> (see GitHub create hook)."""
+  heads = "refs/heads/"
+  if ref.startswith(heads):
+    return ref[len(heads):]
+  if ref.startswith("refs/tags/"):
+    raise ValueError(f"Tag ref not supported for deploy: {ref}")
+  if "/" in ref:
     raise ValueError(f"Unsupported ref: {ref}")
-  return ref[len(prefix):]
+  return ref
 
 
 def _repo_url_from_payload(payload: dict[str, Any]) -> Optional[str]:
@@ -165,7 +170,7 @@ async def github_webhook(
   x_github_delivery: str = Header(default=""),
   x_hub_signature_256: Optional[str] = Header(default=None),
 ) -> dict[str, str]:
-  """Receives GitHub webhook events and starts deployment for push events."""
+  """Receives GitHub webhook events and starts deployment for push and branch-create events."""
 
   body = await request.body()
   _verify_signature(body, x_hub_signature_256)
@@ -178,11 +183,26 @@ async def github_webhook(
   if x_github_event == "ping":
     return {"status": "pong"}
 
+  # CI often creates an autotest branch (create) before or instead of a separate push hook.
+  if x_github_event == "create" and payload.get("ref_type") == "branch":
+    try:
+      branch = _branch_name_from_ref(payload["ref"])
+    except Exception as exc:
+      raise HTTPException(status_code=400, detail=str(exc))
+    sha = payload.get("after", "")
+    background_tasks.add_task(_run_deploy, payload, branch, sha, x_github_delivery)
+    return {
+      "status": "accepted",
+      "branch": branch,
+      "sha": sha,
+      "event": "create",
+    }
+
   if x_github_event != "push":
     return {"status": "ignored", "event": x_github_event}
 
   try:
-    branch = _branch_from_ref(payload["ref"])
+    branch = _branch_name_from_ref(payload["ref"])
   except Exception as exc:
     raise HTTPException(status_code=400, detail=str(exc))
 
