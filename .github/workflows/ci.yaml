@@ -81,6 +81,6 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ github.sha }}
+          tags: ghcr.io/kozlovdan/catty-reminders-app:${{ github.sha }}
           build-args: |
             DEPLOY_REF=${{ github.sha }}
