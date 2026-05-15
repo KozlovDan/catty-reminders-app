@@ -2,4 +2,4 @@
 .env
 __pycache__/
 *.py[cod]
-deploy/frpc.lab2.local.toml
+deploy/frpc.lab3.local.toml
