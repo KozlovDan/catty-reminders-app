@@ -40,6 +40,7 @@ def _deploy_ref_candidate_paths() -> list[str]:
   app_dir = os.getenv("APP_DIR")
   if app_dir:
     add(os.path.join(app_dir, ".env"))
+  add(".env")
   add(os.path.join(os.path.expanduser("~"), "catty-app-deploy", ".env"))
   return ordered
 
@@ -62,8 +63,6 @@ def get_deploy_ref() -> str:
       continue
   return os.getenv("DEPLOY_REF", "NA")
 
-
-DEPLOY_REF = os.getenv("DEPLOY_REF", "NA")
 
 # --------------------------------------------------------------------------------
 # Establish the Secret Key
