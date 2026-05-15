@@ -10,12 +10,23 @@ if [[ -z "$BRANCH" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULT_REPO_URL="$(git -C "$SCRIPT_DIR/.." remote get-url origin 2>/dev/null || true)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+DEFAULT_REPO_URL="$(git -C "$PROJECT_DIR" remote get-url origin 2>/dev/null || true)"
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  DEFAULT_APP_DIR="$PROJECT_DIR"
+  DEFAULT_APP_SERVICE="none"
+  DEFAULT_APP_RESTART_COMMAND="$SCRIPT_DIR/restart-catty-app-macos.sh"
+else
+  DEFAULT_APP_DIR="/opt/catty/app"
+  DEFAULT_APP_SERVICE="catty-app.service"
+  DEFAULT_APP_RESTART_COMMAND=""
+fi
 
 REPO_URL="${REPO_URL:-$DEFAULT_REPO_URL}"
-APP_DIR="${APP_DIR:-/opt/catty/app}"
-APP_SERVICE="${APP_SERVICE:-catty-app.service}"
-APP_RESTART_COMMAND="${APP_RESTART_COMMAND:-}"
+APP_DIR="${APP_DIR:-$DEFAULT_APP_DIR}"
+APP_SERVICE="${APP_SERVICE:-$DEFAULT_APP_SERVICE}"
+APP_RESTART_COMMAND="${APP_RESTART_COMMAND:-$DEFAULT_APP_RESTART_COMMAND}"
 APP_ENV_FILE="${APP_ENV_FILE:-$APP_DIR/.env}"
 LOCK_FILE="${LOCK_FILE:-/tmp/catty-deploy.lock}"
 LOCK_DIR="${LOCK_DIR:-/tmp/catty-deploy.lockdir}"
