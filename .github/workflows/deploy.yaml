@@ -1,0 +1,85 @@
+name: CD
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SSH_HOST: course.prafdin.ru
+  SSH_PORT: "3147"
+  SSH_USER: ${{ secrets.SSH_USER || 'a1234' }}
+  DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/Users/a1234/Documents/uni/devops/danila/catty-reminders-app' }}
+  DEPLOY_BRANCH: lab2
+  APP_URL: http://app.kozlov.course.prafdin.ru/login
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Build and test on runner
+        run: |
+          set -o pipefail
+          python -m pytest tests/test_unit.py -q 2>&1 | tee test_result.txt
+
+      - name: Upload test result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test_result
+          path: test_result.txt
+          if-no-files-found: error
+
+      - name: Resolve deploy SHA
+        run: echo "DEPLOY_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        run: |
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' DEPLOY_BRANCH='$DEPLOY_BRANCH' DEPLOY_SHA='$DEPLOY_SHA' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          cd "$DEPLOY_PATH"
+          APP_DIR="$DEPLOY_PATH" \
+          APP_ENV_FILE="$DEPLOY_PATH/.env" \
+          APP_SERVICE=none \
+          APP_RESTART_COMMAND="$DEPLOY_PATH/scripts/restart-catty-app-macos.sh" \
+          RUN_TESTS=1 \
+          TEST_COMMAND=".venv/bin/python -m pytest tests/test_unit.py" \
+          "$DEPLOY_PATH/scripts/deploy.sh" "$DEPLOY_BRANCH" "$DEPLOY_SHA"
+          REMOTE
+
+      - name: Verify deployed app
+        run: |
+          curl --fail --retry 10 --retry-delay 5 --retry-all-errors "$APP_URL" | grep deployref

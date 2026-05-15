@@ -2,6 +2,4 @@
 .env
 __pycache__/
 *.py[cod]
-deploy/frpc.local.toml
-deploy/webhook.env
-deploy/webhook.macos.env
+deploy/frpc.lab2.local.toml
