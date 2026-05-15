@@ -61,6 +61,21 @@ run_docker_deploy() {
   "$DOCKER_BIN" pull "$IMAGE"
   "$DOCKER_BIN" stop "$CONTAINER_NAME" 2>/dev/null || true
   "$DOCKER_BIN" rm "$CONTAINER_NAME" 2>/dev/null || true
+
+  if command -v lsof >/dev/null 2>&1; then
+    for pid in $(lsof -tiTCP:"$HOST_PORT" -sTCP:LISTEN 2>/dev/null || true); do
+      process_name="$(ps -p "$pid" -o comm= 2>/dev/null || true)"
+      case "$process_name" in
+        *Docker*|*docker*|*OrbStack*)
+          continue
+          ;;
+      esac
+      echo "Stopping process $pid ($process_name) listening on port $HOST_PORT"
+      kill "$pid" 2>/dev/null || true
+    done
+    sleep 1
+  fi
+
   "$DOCKER_BIN" run -d \
     --name "$CONTAINER_NAME" \
     --restart unless-stopped \
