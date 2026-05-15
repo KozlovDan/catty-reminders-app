@@ -329,6 +329,11 @@
       "login": "NITSENSE",
       "id": "kostsov",
       "app": "catty-reminders-app"
+    },
+    {
+      "login": "nikzavadskiy",
+      "id": "zavadskiy",
+      "app": "catty-reminders-app"
     }
   ]
 }
