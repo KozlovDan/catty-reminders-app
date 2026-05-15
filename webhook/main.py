@@ -69,20 +69,24 @@ def _verify_signature(body: bytes, signature: Optional[str]) -> None:
 
 
 def _branch_name_from_ref(ref: str) -> str:
-  """Push uses refs/heads/<name>. Create-branch sends bare <name> (see GitHub create hook)."""
+  """Return a branch name from push refs or create-event bare refs."""
   heads = "refs/heads/"
   if ref.startswith(heads):
     return ref[len(heads):]
   if ref.startswith("refs/tags/"):
     raise ValueError(f"Tag ref not supported for deploy: {ref}")
-  if "/" in ref:
+  if not ref or ref.startswith("refs/"):
     raise ValueError(f"Unsupported ref: {ref}")
   return ref
 
 
 def _repo_url_from_payload(payload: dict[str, Any]) -> Optional[str]:
   repository = payload.get("repository") or {}
-  return repository.get("ssh_url") or repository.get("clone_url")
+  return repository.get("clone_url") or repository.get("ssh_url")
+
+
+def _is_zero_sha(sha: str) -> bool:
+  return bool(sha) and set(sha) == {"0"}
 
 
 def _repo_full_name(payload: dict[str, Any]) -> Optional[str]:
@@ -215,6 +219,9 @@ async def github_webhook(
 
   if x_github_event != "push":
     return {"status": "ignored", "event": x_github_event}
+
+  if payload.get("deleted") or _is_zero_sha(payload.get("after", "")):
+    return {"status": "ignored", "event": "branch_deleted"}
 
   try:
     branch = _branch_name_from_ref(payload["ref"])
