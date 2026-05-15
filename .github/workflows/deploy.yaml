@@ -92,6 +92,8 @@ jobs:
             "IMAGE_NAME='$IMAGE_NAME' CONTAINER_NAME='$CONTAINER_NAME' DEPLOY_SHA='$DEPLOY_SHA' GHCR_USER='${{ github.actor }}' GHCR_TOKEN='${{ secrets.GITHUB_TOKEN }}' bash -s" <<'REMOTE'
           set -Eeuo pipefail
           export PATH="/opt/homebrew/bin:/usr/local/bin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
+          export DOCKER_CONFIG="$(mktemp -d /tmp/catty-docker-config.XXXXXX)"
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
           command -v docker
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
           docker pull "$IMAGE_NAME:$DEPLOY_SHA"
