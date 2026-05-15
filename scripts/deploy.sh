@@ -28,6 +28,10 @@ if [[ -z "$REPO_URL" ]]; then
   exit 2
 fi
 
+# Неинтерактивный git (вебхук без TTY): не ждать пароль SSH, не зависать на host key.
+export GIT_TERMINAL_PROMPT=0
+export GIT_SSH_COMMAND="${GIT_SSH_COMMAND:-ssh -oBatchMode=yes -oStrictHostKeyChecking=accept-new}"
+
 mkdir -p "$(dirname "$LOCK_FILE")"
 if command -v flock >/dev/null 2>&1; then
   exec 200>"$LOCK_FILE"

@@ -142,7 +142,22 @@ def _run_deploy(payload: dict[str, Any], branch: str, sha: str, delivery_id: str
       check=True,
     )
     logger.info("Deployment finished for delivery=%s\n%s", delivery_id, result.stdout)
+    if result.stderr:
+      logger.info("deploy stderr: %s", result.stderr)
     _set_github_status(payload, "success", "Deployment finished")
+  except subprocess.CalledProcessError as exc:
+    logger.error(
+      "Deployment failed for delivery=%s exit=%s\nstdout:\n%s\nstderr:\n%s",
+      delivery_id,
+      exc.returncode,
+      exc.stdout or "",
+      exc.stderr or "",
+    )
+    try:
+      _set_github_status(payload, "failure", f"Deployment failed: exit {exc.returncode}")
+    except Exception:
+      logger.exception("Could not set failure GitHub status")
+    return
   except Exception as exc:
     logger.exception("Deployment failed for delivery=%s", delivery_id)
     try:
