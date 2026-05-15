@@ -105,6 +105,9 @@ else
   printf 'DEPLOY_REF=%s\n' "$DEPLOYED_SHA" >> "$APP_ENV_FILE"
 fi
 
+export APP_DIR APP_ENV_FILE
+export DEPLOY_REF="$DEPLOYED_SHA"
+
 if [[ -n "$APP_RESTART_COMMAND" ]]; then
   bash -lc "$APP_RESTART_COMMAND"
 elif [[ -z "$APP_SERVICE" || "$APP_SERVICE" == "none" ]]; then
