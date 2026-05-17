@@ -59,7 +59,7 @@ jobs:
         uses: appleboy/ssh-action@v1
         with:
           host: course.prafdin.ru
-          port: 3156
+          port: 3147
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |

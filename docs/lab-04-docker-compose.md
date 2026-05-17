@@ -60,20 +60,20 @@ docker compose down -v
 По найденным параметрам:
 
 ```text
-ID=popov
+ID=kozlov
 PROXY=http://course.prafdin.ru
 TOKEN=devops
-SSH_PORT=3156
+SSH_PORT=3147
 ```
 
 FRP должен пробрасывать:
 
-- `app.popov.course.prafdin.ru` на локальный порт `8181`;
-- SSH на порт `3156`.
+- `app.kozlov.course.prafdin.ru` на локальный порт `8181`;
+- SSH на порт `3147`.
 
 Пример находится в `deploy/frpc.example.toml`. В нем нужно заменить:
 
-- `YOUR_ID` на `popov`;
+- `YOUR_ID` на `kozlov`;
 - `tokentoken` на `devops`.
 
 На хосте должен быть установлен Docker Compose:
@@ -101,7 +101,7 @@ APP_DIR
 3. Скрипт обновляет репозиторий на хосте.
 4. Скрипт делает `docker compose pull`.
 5. Скрипт делает `docker compose up -d --remove-orphans`.
-6. Приложение открывается на `http://app.popov.course.prafdin.ru/login`.
+6. Приложение открывается на `http://app.kozlov.course.prafdin.ru/login`.
 7. В HTML страницы логина есть `meta name="deployref"` со значением SHA релизного коммита.
 
 ## Контрольные вопросы

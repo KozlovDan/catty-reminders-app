@@ -14,4 +14,3 @@ customDomains = ["app.YOUR_ID.course.prafdin.ru"]
 name = "ssh-YOUR_ID"
 type = "tcp"
 localPort = 22
-remotePort = 3156
