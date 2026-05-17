@@ -19,7 +19,15 @@ from fastapi.templating import Jinja2Templates
 with open('config.json') as config_json:
   config = json.load(config_json)
   users = config['users']
-  db_path = config['db_path']
+  db_path = os.getenv('DB_PATH', config.get('db_path', 'reminder_db.json'))
+  storage_backend = os.getenv('STORAGE_BACKEND', config.get('storage_backend', 'tinydb')).lower()
+  db_config = {
+    'host': os.getenv('MYSQL_HOST', config.get('db_config', {}).get('host', 'localhost')),
+    'port': int(os.getenv('MYSQL_PORT', config.get('db_config', {}).get('port', 3306))),
+    'user': os.getenv('MYSQL_USER', config.get('db_config', {}).get('user', 'catty')),
+    'password': os.getenv('MYSQL_PASSWORD', config.get('db_config', {}).get('password', 'catty')),
+    'database': os.getenv('MYSQL_DATABASE', config.get('db_config', {}).get('database', 'catty_reminders')),
+  }
 
 DEPLOY_REF = os.getenv("DEPLOY_REF", "NA")
 

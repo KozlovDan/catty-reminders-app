@@ -3,12 +3,12 @@ name: CI
 on:
   push:
     branches:
-      - lab3
-      - lab3_autotests*
+      - lab4
+      - lab4_autotests*
   pull_request:
     branches:
-      - lab3
-      - lab3_autotests*
+      - lab4
+      - lab4_autotests*
 
 permissions:
   contents: read
@@ -32,22 +32,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-          python -m playwright install chromium
-
-      - name: Start application
-        env:
-          DEPLOY_REF: ${{ github.sha }}
-        run: |
-          python -m uvicorn app.main:app --host 127.0.0.1 --port 8181 &
-          for i in {1..30}; do
-            curl --fail --silent http://127.0.0.1:8181/login >/dev/null && exit 0
-            sleep 1
-          done
-          exit 1
 
       - name: Run tests
         run: |
-          python -m pytest -v --browser chromium --junitxml=test_result.xml tests
+          python -m pytest -v --junitxml=test_result.xml tests/test_unit.py
 
       - name: Upload test result
         if: always()
@@ -68,6 +56,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Prepare image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -81,6 +73,24 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/kozlovdan/catty-reminders-app:${{ github.sha }}
+          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
           build-args: |
             DEPLOY_REF=${{ github.sha }}
+
+      - name: Smoke test Docker Compose stack
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          DEPLOY_REF: ${{ github.sha }}
+        run: |
+          docker compose config
+          docker compose up -d
+          for i in {1..60}; do
+            curl --fail --silent http://127.0.0.1:8181/login >/dev/null && exit 0
+            sleep 2
+          done
+          docker compose logs
+          exit 1
+
+      - name: Stop Docker Compose stack
+        if: always()
+        run: docker compose down

@@ -41,6 +41,28 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8181
 
 Then, open your browser to [`http://127.0.0.1:8181`](http://127.0.0.1:8181) to load the app.
 
+## Running with Docker Compose
+
+Build the application image:
+
+```bash
+docker build -t catty-reminders-app:local .
+```
+
+Start the app and MySQL database:
+
+```bash
+IMAGE=catty-reminders-app:local DEPLOY_REF=local-compose docker compose up -d
+```
+
+Then open [`http://127.0.0.1:8181/login`](http://127.0.0.1:8181/login).
+
+Stop the stack:
+
+```bash
+docker compose down
+```
+
 
 
 ## Logging into the app

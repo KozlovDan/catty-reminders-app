@@ -19,6 +19,7 @@ CONTAINER_NAME="${CONTAINER_NAME:-catty-reminders-app}"
 CONTAINER_PORT="${CONTAINER_PORT:-8181}"
 HOST_PORT="${HOST_PORT:-8181}"
 DOCKER_BIN="${DOCKER_BIN:-}"
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}"
 LOCK_FILE="${LOCK_FILE:-/tmp/catty-deploy.lock}"
 LOCK_DIR="${LOCK_DIR:-/tmp/catty-deploy.lockdir}"
 
@@ -32,7 +33,7 @@ if [[ -z "$IMAGE" ]]; then
   exit 2
 fi
 
-run_docker_deploy() {
+run_compose_deploy() {
   if [[ -z "$DOCKER_BIN" ]]; then
     DOCKER_BIN="$(command -v docker || true)"
   fi
@@ -58,7 +59,11 @@ run_docker_deploy() {
     echo "$GITHUB_TOKEN" | "$DOCKER_BIN" login ghcr.io -u "${GITHUB_ACTOR:-github-actions}" --password-stdin
   fi
 
-  "$DOCKER_BIN" pull "$IMAGE"
+  if ! "$DOCKER_BIN" compose version >/dev/null 2>&1; then
+    echo "docker compose command not found" >&2
+    exit 1
+  fi
+
   "$DOCKER_BIN" stop "$CONTAINER_NAME" 2>/dev/null || true
   "$DOCKER_BIN" rm "$CONTAINER_NAME" 2>/dev/null || true
 
@@ -76,12 +81,13 @@ run_docker_deploy() {
     sleep 1
   fi
 
-  "$DOCKER_BIN" run -d \
-    --name "$CONTAINER_NAME" \
-    --restart unless-stopped \
-    -p "$HOST_PORT:$CONTAINER_PORT" \
-    -e DEPLOY_REF="${REQUESTED_SHA:-NA}" \
-    "$IMAGE"
+  export IMAGE
+  export DEPLOY_REF="${REQUESTED_SHA:-NA}"
+  export HOST_PORT
+  export APP_PULL_POLICY="${APP_PULL_POLICY:-always}"
+
+  "$DOCKER_BIN" compose -f "$APP_DIR/$COMPOSE_FILE" pull
+  "$DOCKER_BIN" compose -f "$APP_DIR/$COMPOSE_FILE" up -d --remove-orphans
 }
 
 mkdir -p "$(dirname "$LOCK_FILE")"
@@ -117,6 +123,6 @@ if [[ -n "$REQUESTED_SHA" && "$DEPLOYED_SHA" != "$REQUESTED_SHA" ]]; then
   exit 1
 fi
 
-run_docker_deploy
+run_compose_deploy
 
-echo "Docker deployment completed at $DEPLOYED_SHA with $IMAGE"
+echo "Docker Compose deployment completed at $DEPLOYED_SHA with $IMAGE"

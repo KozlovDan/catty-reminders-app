@@ -1,0 +1,47 @@
+name: catty-reminders
+
+services:
+  app:
+    image: ${IMAGE:-catty-reminders-app:local}
+    pull_policy: ${APP_PULL_POLICY:-missing}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${HOST_PORT:-8181}:8181"
+    environment:
+      DEPLOY_REF: ${DEPLOY_REF:-NA}
+      STORAGE_BACKEND: mysql
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-catty}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-catty}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-catty_reminders}
+    networks:
+      - catty
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-catty_root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-catty_reminders}
+      MYSQL_USER: ${MYSQL_USER:-catty}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-catty}
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+    volumes:
+      - catty_mysql_data:/var/lib/mysql
+    networks:
+      - catty
+
+volumes:
+  catty_mysql_data:
+
+networks:
+  catty:
