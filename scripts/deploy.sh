@@ -16,12 +16,11 @@ REPO_URL="${REPO_URL:-$DEFAULT_REPO_URL}"
 APP_DIR="${APP_DIR:-/opt/catty/app}"
 IMAGE="${IMAGE:-}"
 CONTAINER_NAME="${CONTAINER_NAME:-catty-reminders-app}"
-CONTAINER_PORT="${CONTAINER_PORT:-8181}"
-HOST_PORT="${HOST_PORT:-8181}"
+DB_CONTAINER_NAME="${DB_CONTAINER_NAME:-catty-reminders-db-1}"
 DOCKER_BIN="${DOCKER_BIN:-}"
-COMPOSE_BIN="${COMPOSE_BIN:-}"
-COMPOSE_MODE=""
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}"
+DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN:-}"
+COMPOSE_FILE_PATH="${COMPOSE_FILE_PATH:-$APP_DIR/docker-compose.yaml}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-catty-reminders}"
 LOCK_FILE="${LOCK_FILE:-/tmp/catty-deploy.lock}"
 LOCK_DIR="${LOCK_DIR:-/tmp/catty-deploy.lockdir}"
 
@@ -36,42 +35,17 @@ if [[ -z "$IMAGE" ]]; then
 fi
 
 run_compose_deploy() {
-  local docker_candidates=()
-  local compose_candidates=()
-  local candidate
-  local candidate_realpath
+  local compose_cmd=()
 
-  export IMAGE
-  export DEPLOY_REF="${REQUESTED_SHA:-NA}"
-  export HOST_PORT
-  export APP_PULL_POLICY="${APP_PULL_POLICY:-always}"
-
-  if [[ -n "$DOCKER_BIN" ]]; then
-    docker_candidates+=("$DOCKER_BIN")
+  if [[ -z "$DOCKER_BIN" ]]; then
+    DOCKER_BIN="$(command -v docker || true)"
   fi
-  docker_candidates+=(
-    "/Applications/Docker.app/Contents/Resources/bin/docker"
-    "/opt/homebrew/bin/docker"
-    "/usr/local/bin/docker"
-  )
-  if command -v docker >/dev/null 2>&1; then
-    docker_candidates+=("$(command -v docker)")
+  if [[ -z "$DOCKER_BIN" && -x /opt/homebrew/bin/docker ]]; then
+    DOCKER_BIN="/opt/homebrew/bin/docker"
   fi
-
-  DOCKER_BIN=""
-  for candidate in "${docker_candidates[@]}"; do
-    if [[ -x "$candidate" ]]; then
-      if [[ -z "$DOCKER_BIN" ]]; then
-        DOCKER_BIN="$candidate"
-      fi
-      if "$candidate" compose -f "$APP_DIR/$COMPOSE_FILE" config >/dev/null 2>&1; then
-        DOCKER_BIN="$candidate"
-        COMPOSE_MODE="plugin"
-        break
-      fi
-    fi
-  done
-
+  if [[ -z "$DOCKER_BIN" && -x /usr/local/bin/docker ]]; then
+    DOCKER_BIN="/usr/local/bin/docker"
+  fi
   if [[ -z "$DOCKER_BIN" ]]; then
     echo "docker command not found" >&2
     exit 1
@@ -81,80 +55,43 @@ run_compose_deploy() {
   export DOCKER_CONFIG="${DOCKER_CONFIG:-/tmp/catty-docker-config}"
   mkdir -p "$DOCKER_CONFIG"
 
+  if [[ -n "$DOCKER_COMPOSE_BIN" ]]; then
+    compose_cmd=("$DOCKER_COMPOSE_BIN")
+  elif "$DOCKER_BIN" compose version >/dev/null 2>&1; then
+    compose_cmd=("$DOCKER_BIN" "compose")
+  elif command -v docker-compose >/dev/null 2>&1; then
+    compose_cmd=("$(command -v docker-compose)")
+  elif [[ -x /opt/homebrew/bin/docker-compose ]]; then
+    compose_cmd=("/opt/homebrew/bin/docker-compose")
+  elif [[ -x /usr/local/bin/docker-compose ]]; then
+    compose_cmd=("/usr/local/bin/docker-compose")
+  else
+    echo "docker compose command not found" >&2
+    exit 1
+  fi
+
   if [[ -n "${GITHUB_TOKEN:-}" ]]; then
     echo "$GITHUB_TOKEN" | "$DOCKER_BIN" login ghcr.io -u "${GITHUB_ACTOR:-github-actions}" --password-stdin
   fi
 
-  if [[ -z "$COMPOSE_MODE" ]]; then
-    if [[ -n "$COMPOSE_BIN" ]]; then
-      compose_candidates+=("$COMPOSE_BIN")
-    fi
-    compose_candidates+=(
-      "/opt/homebrew/bin/docker-compose"
-      "/usr/local/bin/docker-compose"
-    )
-    if command -v docker-compose >/dev/null 2>&1; then
-      compose_candidates+=("$(command -v docker-compose)")
-    fi
-
-    COMPOSE_BIN=""
-    for candidate in "${compose_candidates[@]}"; do
-      if [[ -x "$candidate" ]]; then
-        candidate_realpath="$(realpath "$candidate" 2>/dev/null || echo "$candidate")"
-        if [[ "$(basename "$candidate_realpath")" == "docker" ]]; then
-          continue
-        fi
-        if "$candidate" -f "$APP_DIR/$COMPOSE_FILE" config >/dev/null 2>&1; then
-          COMPOSE_BIN="$candidate"
-          COMPOSE_MODE="standalone"
-          break
-        fi
-      fi
-    done
-  fi
-
-  if [[ -z "$COMPOSE_MODE" && "$DOCKER_BIN" == "/usr/local/bin/docker" && -x /Applications/Docker.app/Contents/Resources/bin/docker ]]; then
-    DOCKER_BIN="/Applications/Docker.app/Contents/Resources/bin/docker"
-    if "$DOCKER_BIN" compose -f "$APP_DIR/$COMPOSE_FILE" config >/dev/null 2>&1; then
-      COMPOSE_MODE="plugin"
-    fi
-  fi
-
-  if [[ -z "$COMPOSE_MODE" ]]; then
-    echo "docker compose command not found; install Docker Compose plugin or docker-compose" >&2
+  if [[ ! -f "$COMPOSE_FILE_PATH" ]]; then
+    echo "docker compose file not found at $COMPOSE_FILE_PATH" >&2
     exit 1
-  fi
-
-  if [[ "$COMPOSE_MODE" == "plugin" ]]; then
-    echo "Using Docker Compose plugin: $DOCKER_BIN compose"
-  else
-    echo "Using standalone Docker Compose: $COMPOSE_BIN"
   fi
 
   "$DOCKER_BIN" stop "$CONTAINER_NAME" 2>/dev/null || true
   "$DOCKER_BIN" rm "$CONTAINER_NAME" 2>/dev/null || true
+  "$DOCKER_BIN" stop "$DB_CONTAINER_NAME" 2>/dev/null || true
+  "$DOCKER_BIN" rm "$DB_CONTAINER_NAME" 2>/dev/null || true
 
-  if command -v lsof >/dev/null 2>&1; then
-    for pid in $(lsof -tiTCP:"$HOST_PORT" -sTCP:LISTEN 2>/dev/null || true); do
-      process_name="$(ps -p "$pid" -o comm= 2>/dev/null || true)"
-      case "$process_name" in
-        *Docker*|*docker*|*OrbStack*)
-          continue
-          ;;
-      esac
-      echo "Stopping process $pid ($process_name) listening on port $HOST_PORT"
-      kill "$pid" 2>/dev/null || true
-    done
-    sleep 1
-  fi
+  export IMAGE
+  export DEPLOY_REF="${REQUESTED_SHA:-NA}"
+  export APP_PULL_POLICY="${APP_PULL_POLICY:-always}"
 
-  if [[ "$COMPOSE_MODE" == "plugin" ]]; then
-    "$DOCKER_BIN" compose -f "$APP_DIR/$COMPOSE_FILE" pull
-    "$DOCKER_BIN" compose -f "$APP_DIR/$COMPOSE_FILE" up -d --remove-orphans
-  else
-    "$COMPOSE_BIN" -f "$APP_DIR/$COMPOSE_FILE" pull
-    "$COMPOSE_BIN" -f "$APP_DIR/$COMPOSE_FILE" up -d --remove-orphans
-  fi
+  echo "Using Docker Compose command: ${compose_cmd[*]}"
+  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" pull
+  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" up -d --remove-orphans
+  "$DOCKER_BIN" image prune -af >/dev/null 2>&1 || true
 }
 
 mkdir -p "$(dirname "$LOCK_FILE")"
