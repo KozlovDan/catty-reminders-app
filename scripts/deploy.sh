@@ -39,6 +39,7 @@ run_compose_deploy() {
   local docker_candidates=()
   local compose_candidates=()
   local candidate
+  local candidate_realpath
 
   export IMAGE
   export DEPLOY_REF="${REQUESTED_SHA:-NA}"
@@ -48,14 +49,14 @@ run_compose_deploy() {
   if [[ -n "$DOCKER_BIN" ]]; then
     docker_candidates+=("$DOCKER_BIN")
   fi
+  docker_candidates+=(
+    "/Applications/Docker.app/Contents/Resources/bin/docker"
+    "/opt/homebrew/bin/docker"
+    "/usr/local/bin/docker"
+  )
   if command -v docker >/dev/null 2>&1; then
     docker_candidates+=("$(command -v docker)")
   fi
-  docker_candidates+=(
-    "/opt/homebrew/bin/docker"
-    "/usr/local/bin/docker"
-    "/Applications/Docker.app/Contents/Resources/bin/docker"
-  )
 
   DOCKER_BIN=""
   for candidate in "${docker_candidates[@]}"; do
@@ -88,17 +89,21 @@ run_compose_deploy() {
     if [[ -n "$COMPOSE_BIN" ]]; then
       compose_candidates+=("$COMPOSE_BIN")
     fi
-    if command -v docker-compose >/dev/null 2>&1; then
-      compose_candidates+=("$(command -v docker-compose)")
-    fi
     compose_candidates+=(
       "/opt/homebrew/bin/docker-compose"
       "/usr/local/bin/docker-compose"
     )
+    if command -v docker-compose >/dev/null 2>&1; then
+      compose_candidates+=("$(command -v docker-compose)")
+    fi
 
     COMPOSE_BIN=""
     for candidate in "${compose_candidates[@]}"; do
       if [[ -x "$candidate" ]]; then
+        candidate_realpath="$(realpath "$candidate" 2>/dev/null || echo "$candidate")"
+        if [[ "$(basename "$candidate_realpath")" == "docker" ]]; then
+          continue
+        fi
         if "$candidate" -f "$APP_DIR/$COMPOSE_FILE" config >/dev/null 2>&1; then
           COMPOSE_BIN="$candidate"
           COMPOSE_MODE="standalone"
@@ -118,6 +123,12 @@ run_compose_deploy() {
   if [[ -z "$COMPOSE_MODE" ]]; then
     echo "docker compose command not found; install Docker Compose plugin or docker-compose" >&2
     exit 1
+  fi
+
+  if [[ "$COMPOSE_MODE" == "plugin" ]]; then
+    echo "Using Docker Compose plugin: $DOCKER_BIN compose"
+  else
+    echo "Using standalone Docker Compose: $COMPOSE_BIN"
   fi
 
   "$DOCKER_BIN" stop "$CONTAINER_NAME" 2>/dev/null || true
