@@ -39,7 +39,11 @@ run_compose_deploy() {
   local docker_candidates=()
   local compose_candidates=()
   local candidate
-  local version_output
+
+  export IMAGE
+  export DEPLOY_REF="${REQUESTED_SHA:-NA}"
+  export HOST_PORT
+  export APP_PULL_POLICY="${APP_PULL_POLICY:-always}"
 
   if [[ -n "$DOCKER_BIN" ]]; then
     docker_candidates+=("$DOCKER_BIN")
@@ -56,8 +60,11 @@ run_compose_deploy() {
   DOCKER_BIN=""
   for candidate in "${docker_candidates[@]}"; do
     if [[ -x "$candidate" ]]; then
-      DOCKER_BIN="$candidate"
-      if "$candidate" compose version >/dev/null 2>&1; then
+      if [[ -z "$DOCKER_BIN" ]]; then
+        DOCKER_BIN="$candidate"
+      fi
+      if "$candidate" compose -f "$APP_DIR/$COMPOSE_FILE" config >/dev/null 2>&1; then
+        DOCKER_BIN="$candidate"
         COMPOSE_MODE="plugin"
         break
       fi
@@ -92,8 +99,7 @@ run_compose_deploy() {
     COMPOSE_BIN=""
     for candidate in "${compose_candidates[@]}"; do
       if [[ -x "$candidate" ]]; then
-        version_output="$("$candidate" version 2>/dev/null || true)"
-        if [[ "$version_output" == *"Docker Compose"* || "$version_output" == *"docker-compose"* ]]; then
+        if "$candidate" -f "$APP_DIR/$COMPOSE_FILE" config >/dev/null 2>&1; then
           COMPOSE_BIN="$candidate"
           COMPOSE_MODE="standalone"
           break
@@ -104,7 +110,7 @@ run_compose_deploy() {
 
   if [[ -z "$COMPOSE_MODE" && "$DOCKER_BIN" == "/usr/local/bin/docker" && -x /Applications/Docker.app/Contents/Resources/bin/docker ]]; then
     DOCKER_BIN="/Applications/Docker.app/Contents/Resources/bin/docker"
-    if "$DOCKER_BIN" compose version >/dev/null 2>&1; then
+    if "$DOCKER_BIN" compose -f "$APP_DIR/$COMPOSE_FILE" config >/dev/null 2>&1; then
       COMPOSE_MODE="plugin"
     fi
   fi
@@ -130,11 +136,6 @@ run_compose_deploy() {
     done
     sleep 1
   fi
-
-  export IMAGE
-  export DEPLOY_REF="${REQUESTED_SHA:-NA}"
-  export HOST_PORT
-  export APP_PULL_POLICY="${APP_PULL_POLICY:-always}"
 
   if [[ "$COMPOSE_MODE" == "plugin" ]]; then
     "$DOCKER_BIN" compose -f "$APP_DIR/$COMPOSE_FILE" pull
