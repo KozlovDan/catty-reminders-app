@@ -19,6 +19,8 @@ CONTAINER_NAME="${CONTAINER_NAME:-catty-reminders-app}"
 CONTAINER_PORT="${CONTAINER_PORT:-8181}"
 HOST_PORT="${HOST_PORT:-8181}"
 DOCKER_BIN="${DOCKER_BIN:-}"
+COMPOSE_BIN="${COMPOSE_BIN:-}"
+COMPOSE_MODE=""
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yaml}"
 LOCK_FILE="${LOCK_FILE:-/tmp/catty-deploy.lock}"
 LOCK_DIR="${LOCK_DIR:-/tmp/catty-deploy.lockdir}"
@@ -34,18 +36,32 @@ if [[ -z "$IMAGE" ]]; then
 fi
 
 run_compose_deploy() {
-  if [[ -z "$DOCKER_BIN" ]]; then
-    DOCKER_BIN="$(command -v docker || true)"
+  local docker_candidates=()
+  local candidate
+
+  if [[ -n "$DOCKER_BIN" ]]; then
+    docker_candidates+=("$DOCKER_BIN")
   fi
-  if [[ -z "$DOCKER_BIN" && -x /opt/homebrew/bin/docker ]]; then
-    DOCKER_BIN="/opt/homebrew/bin/docker"
+  if command -v docker >/dev/null 2>&1; then
+    docker_candidates+=("$(command -v docker)")
   fi
-  if [[ -z "$DOCKER_BIN" && -x /usr/local/bin/docker ]]; then
-    DOCKER_BIN="/usr/local/bin/docker"
-  fi
-  if [[ -z "$DOCKER_BIN" && -x /Applications/Docker.app/Contents/Resources/bin/docker ]]; then
-    DOCKER_BIN="/Applications/Docker.app/Contents/Resources/bin/docker"
-  fi
+  docker_candidates+=(
+    "/opt/homebrew/bin/docker"
+    "/usr/local/bin/docker"
+    "/Applications/Docker.app/Contents/Resources/bin/docker"
+  )
+
+  DOCKER_BIN=""
+  for candidate in "${docker_candidates[@]}"; do
+    if [[ -x "$candidate" ]]; then
+      DOCKER_BIN="$candidate"
+      if "$candidate" compose version >/dev/null 2>&1; then
+        COMPOSE_MODE="plugin"
+        break
+      fi
+    fi
+  done
+
   if [[ -z "$DOCKER_BIN" ]]; then
     echo "docker command not found" >&2
     exit 1
@@ -59,8 +75,23 @@ run_compose_deploy() {
     echo "$GITHUB_TOKEN" | "$DOCKER_BIN" login ghcr.io -u "${GITHUB_ACTOR:-github-actions}" --password-stdin
   fi
 
-  if ! "$DOCKER_BIN" compose version >/dev/null 2>&1; then
-    echo "docker compose command not found" >&2
+  if [[ -z "$COMPOSE_MODE" ]]; then
+    if [[ -z "$COMPOSE_BIN" ]]; then
+      COMPOSE_BIN="$(command -v docker-compose || true)"
+    fi
+    if [[ -z "$COMPOSE_BIN" && -x /opt/homebrew/bin/docker-compose ]]; then
+      COMPOSE_BIN="/opt/homebrew/bin/docker-compose"
+    fi
+    if [[ -z "$COMPOSE_BIN" && -x /usr/local/bin/docker-compose ]]; then
+      COMPOSE_BIN="/usr/local/bin/docker-compose"
+    fi
+    if [[ -n "$COMPOSE_BIN" ]]; then
+      COMPOSE_MODE="standalone"
+    fi
+  fi
+
+  if [[ -z "$COMPOSE_MODE" ]]; then
+    echo "docker compose command not found; install Docker Compose plugin or docker-compose" >&2
     exit 1
   fi
 
@@ -86,8 +117,13 @@ run_compose_deploy() {
   export HOST_PORT
   export APP_PULL_POLICY="${APP_PULL_POLICY:-always}"
 
-  "$DOCKER_BIN" compose -f "$APP_DIR/$COMPOSE_FILE" pull
-  "$DOCKER_BIN" compose -f "$APP_DIR/$COMPOSE_FILE" up -d --remove-orphans
+  if [[ "$COMPOSE_MODE" == "plugin" ]]; then
+    "$DOCKER_BIN" compose -f "$APP_DIR/$COMPOSE_FILE" pull
+    "$DOCKER_BIN" compose -f "$APP_DIR/$COMPOSE_FILE" up -d --remove-orphans
+  else
+    "$COMPOSE_BIN" -f "$APP_DIR/$COMPOSE_FILE" pull
+    "$COMPOSE_BIN" -f "$APP_DIR/$COMPOSE_FILE" up -d --remove-orphans
+  fi
 }
 
 mkdir -p "$(dirname "$LOCK_FILE")"
