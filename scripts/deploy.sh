@@ -37,7 +37,9 @@ fi
 
 run_compose_deploy() {
   local docker_candidates=()
+  local compose_candidates=()
   local candidate
+  local version_output
 
   if [[ -n "$DOCKER_BIN" ]]; then
     docker_candidates+=("$DOCKER_BIN")
@@ -76,17 +78,34 @@ run_compose_deploy() {
   fi
 
   if [[ -z "$COMPOSE_MODE" ]]; then
-    if [[ -z "$COMPOSE_BIN" ]]; then
-      COMPOSE_BIN="$(command -v docker-compose || true)"
-    fi
-    if [[ -z "$COMPOSE_BIN" && -x /opt/homebrew/bin/docker-compose ]]; then
-      COMPOSE_BIN="/opt/homebrew/bin/docker-compose"
-    fi
-    if [[ -z "$COMPOSE_BIN" && -x /usr/local/bin/docker-compose ]]; then
-      COMPOSE_BIN="/usr/local/bin/docker-compose"
-    fi
     if [[ -n "$COMPOSE_BIN" ]]; then
-      COMPOSE_MODE="standalone"
+      compose_candidates+=("$COMPOSE_BIN")
+    fi
+    if command -v docker-compose >/dev/null 2>&1; then
+      compose_candidates+=("$(command -v docker-compose)")
+    fi
+    compose_candidates+=(
+      "/opt/homebrew/bin/docker-compose"
+      "/usr/local/bin/docker-compose"
+    )
+
+    COMPOSE_BIN=""
+    for candidate in "${compose_candidates[@]}"; do
+      if [[ -x "$candidate" ]]; then
+        version_output="$("$candidate" version 2>/dev/null || true)"
+        if [[ "$version_output" == *"Docker Compose"* || "$version_output" == *"docker-compose"* ]]; then
+          COMPOSE_BIN="$candidate"
+          COMPOSE_MODE="standalone"
+          break
+        fi
+      fi
+    done
+  fi
+
+  if [[ -z "$COMPOSE_MODE" && "$DOCKER_BIN" == "/usr/local/bin/docker" && -x /Applications/Docker.app/Contents/Resources/bin/docker ]]; then
+    DOCKER_BIN="/Applications/Docker.app/Contents/Resources/bin/docker"
+    if "$DOCKER_BIN" compose version >/dev/null 2>&1; then
+      COMPOSE_MODE="plugin"
     fi
   fi
 
