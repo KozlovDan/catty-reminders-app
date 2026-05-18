@@ -11,7 +11,6 @@ services:
     ports:
       - "${HOST_PORT:-8181}:8181"
     environment:
-      DEPLOY_REF: ${DEPLOY_REF:-NA}
       STORAGE_BACKEND: mysql
       MYSQL_HOST: db
       MYSQL_PORT: 3306

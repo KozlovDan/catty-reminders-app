@@ -46,13 +46,13 @@ Then, open your browser to [`http://127.0.0.1:8181`](http://127.0.0.1:8181) to l
 Build the application image:
 
 ```bash
-docker build -t catty-reminders-app:local .
+docker build --build-arg DEPLOY_REF=local-compose -t catty-reminders-app:local .
 ```
 
 Start the app and MySQL database:
 
 ```bash
-IMAGE=catty-reminders-app:local DEPLOY_REF=local-compose docker compose up -d
+IMAGE=catty-reminders-app:local docker compose up -d
 ```
 
 Then open [`http://127.0.0.1:8181/login`](http://127.0.0.1:8181/login).

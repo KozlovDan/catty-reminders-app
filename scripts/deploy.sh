@@ -9,10 +9,6 @@ if [[ -z "$BRANCH" ]]; then
   exit 2
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULT_REPO_URL="$(git -C "$SCRIPT_DIR/.." remote get-url origin 2>/dev/null || true)"
-
-REPO_URL="${REPO_URL:-$DEFAULT_REPO_URL}"
 APP_DIR="${APP_DIR:-/opt/catty/app}"
 IMAGE="${IMAGE:-}"
 CONTAINER_NAME="${CONTAINER_NAME:-catty-reminders-app}"
@@ -23,11 +19,6 @@ COMPOSE_FILE_PATH="${COMPOSE_FILE_PATH:-$APP_DIR/docker-compose.yaml}"
 COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-catty-reminders}"
 LOCK_FILE="${LOCK_FILE:-/tmp/catty-deploy.lock}"
 LOCK_DIR="${LOCK_DIR:-/tmp/catty-deploy.lockdir}"
-
-if [[ -z "$REPO_URL" ]]; then
-  echo "REPO_URL is not set and could not be read from git remote origin" >&2
-  exit 2
-fi
 
 if [[ -z "$IMAGE" ]]; then
   echo "IMAGE is required for Docker deployment" >&2
@@ -85,7 +76,6 @@ run_compose_deploy() {
   "$DOCKER_BIN" rm "$DB_CONTAINER_NAME" 2>/dev/null || true
 
   export IMAGE
-  export DEPLOY_REF="${REQUESTED_SHA:-NA}"
   export APP_PULL_POLICY="${APP_PULL_POLICY:-always}"
 
   echo "Using Docker Compose command: ${compose_cmd[*]}"
@@ -105,28 +95,8 @@ else
   trap 'rmdir "$LOCK_DIR"' EXIT
 fi
 
-echo "Deploying branch '$BRANCH' from '$REPO_URL' into '$APP_DIR'"
-
-if [[ ! -d "$APP_DIR/.git" ]]; then
-  mkdir -p "$(dirname "$APP_DIR")"
-  git clone "$REPO_URL" "$APP_DIR"
-fi
-
-git -C "$APP_DIR" fetch --prune origin '+refs/heads/*:refs/remotes/origin/*'
-git -C "$APP_DIR" checkout -B "$BRANCH" "origin/$BRANCH"
-
-if [[ -n "$REQUESTED_SHA" ]]; then
-  git -C "$APP_DIR" reset --hard "$REQUESTED_SHA"
-else
-  git -C "$APP_DIR" reset --hard "origin/$BRANCH"
-fi
-
-DEPLOYED_SHA="$(git -C "$APP_DIR" rev-parse HEAD)"
-if [[ -n "$REQUESTED_SHA" && "$DEPLOYED_SHA" != "$REQUESTED_SHA" ]]; then
-  echo "Requested SHA $REQUESTED_SHA, deployed SHA $DEPLOYED_SHA" >&2
-  exit 1
-fi
+echo "Deploying image '$IMAGE' for branch '$BRANCH' using compose file '$COMPOSE_FILE_PATH'"
 
 run_compose_deploy
 
-echo "Docker Compose deployment completed at $DEPLOYED_SHA with $IMAGE"
+echo "Docker Compose deployment completed for ${REQUESTED_SHA:-unknown} with $IMAGE"

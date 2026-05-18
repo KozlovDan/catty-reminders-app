@@ -26,14 +26,13 @@
 Сначала собрать image:
 
 ```bash
-docker build -t catty-reminders-app:local .
+docker build --build-arg DEPLOY_REF=local-compose -t catty-reminders-app:local .
 ```
 
 Затем поднять стек:
 
 ```bash
 IMAGE=catty-reminders-app:local \
-DEPLOY_REF=local-compose \
 docker compose up -d
 ```
 
@@ -98,7 +97,7 @@ APP_DIR
 
 1. GitHub Actions собирает image `ghcr.io/<owner>/<repo>:<sha>`.
 2. По SSH запускается `scripts/deploy.sh lab4 <sha>`.
-3. Скрипт обновляет репозиторий на хосте.
+3. Скрипт использует уже лежащий на хосте `docker-compose.yaml`.
 4. Скрипт делает `docker compose pull`.
 5. Скрипт делает `docker compose up -d --remove-orphans`.
 6. Приложение открывается на `http://app.kozlov.course.prafdin.ru/login`.
