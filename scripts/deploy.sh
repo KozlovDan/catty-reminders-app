@@ -79,8 +79,9 @@ run_compose_deploy() {
   export APP_PULL_POLICY="${APP_PULL_POLICY:-always}"
 
   echo "Using Docker Compose command: ${compose_cmd[*]}"
+  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" down --remove-orphans
   "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" pull
-  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" up -d --remove-orphans
+  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" up -d --force-recreate --remove-orphans
   "$DOCKER_BIN" image prune -af >/dev/null 2>&1 || true
 }
 

@@ -16,6 +16,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.target_commitish }}
+
+      - name: Resolve deploy commit
+        id: deploy
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -51,9 +57,9 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          tags: ${{ steps.image.outputs.name }}:${{ steps.deploy.outputs.sha }}
           build-args: |
-            DEPLOY_REF=${{ github.sha }}
+            DEPLOY_REF=${{ steps.deploy.outputs.sha }}
 
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
@@ -68,8 +74,8 @@ jobs:
               APP_DIR="$HOME/catty-reminders-app"
             fi
             cd "$APP_DIR"
-            IMAGE="${{ steps.image.outputs.name }}:${{ github.sha }}" \
+            IMAGE="${{ steps.image.outputs.name }}:${{ steps.deploy.outputs.sha }}" \
             GITHUB_ACTOR="${{ github.actor }}" \
             GITHUB_TOKEN="${{ github.token }}" \
             APP_DIR="$PWD" \
-            ./scripts/deploy.sh lab4 ${{ github.sha }}
+            ./scripts/deploy.sh lab4 ${{ steps.deploy.outputs.sha }}
