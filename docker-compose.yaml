@@ -1,9 +1,24 @@
-name: catty-reminders
-
 services:
+  db:
+    image: mariadb:10.11
+    container_name: catty-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: mypass
+      MYSQL_DATABASE: catty_reminders
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    volumes:
+      - catty-db-data:/var/lib/mysql
+
   app:
     image: ${IMAGE:-catty-reminders-app:local}
     pull_policy: ${APP_PULL_POLICY:-missing}
+    container_name: catty-reminders-app
     restart: unless-stopped
     depends_on:
       db:
@@ -13,34 +28,15 @@ services:
     environment:
       STORAGE_BACKEND: mysql
       MYSQL_HOST: db
-      MYSQL_PORT: 3306
-      MYSQL_USER: ${MYSQL_USER:-catty}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-catty}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-catty_reminders}
-    networks:
-      - catty
-
-  db:
-    image: mysql:8.4
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-catty_root}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-catty_reminders}
-      MYSQL_USER: ${MYSQL_USER:-catty}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-catty}
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-      start_period: 20s
-    volumes:
-      - catty_mysql_data:/var/lib/mysql
-    networks:
-      - catty
+      MYSQL_PORT: "3306"
+      MYSQL_USER: root
+      MYSQL_PASSWORD: mypass
+      MYSQL_DATABASE: catty_reminders
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: mypass
+      DB_NAME: catty_reminders
 
 volumes:
-  catty_mysql_data:
-
-networks:
-  catty:
+  catty-db-data:

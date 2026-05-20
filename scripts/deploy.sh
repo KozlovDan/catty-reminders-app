@@ -12,11 +12,10 @@ fi
 APP_DIR="${APP_DIR:-/opt/catty/app}"
 IMAGE="${IMAGE:-}"
 CONTAINER_NAME="${CONTAINER_NAME:-catty-reminders-app}"
-DB_CONTAINER_NAME="${DB_CONTAINER_NAME:-catty-reminders-db-1}"
 DOCKER_BIN="${DOCKER_BIN:-}"
 DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN:-}"
 COMPOSE_FILE_PATH="${COMPOSE_FILE_PATH:-$APP_DIR/docker-compose.yaml}"
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-catty-reminders}"
+COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-catty}"
 LOCK_FILE="${LOCK_FILE:-/tmp/catty-deploy.lock}"
 LOCK_DIR="${LOCK_DIR:-/tmp/catty-deploy.lockdir}"
 
@@ -70,18 +69,32 @@ run_compose_deploy() {
     exit 1
   fi
 
-  "$DOCKER_BIN" stop "$CONTAINER_NAME" 2>/dev/null || true
-  "$DOCKER_BIN" rm "$CONTAINER_NAME" 2>/dev/null || true
-  "$DOCKER_BIN" stop "$DB_CONTAINER_NAME" 2>/dev/null || true
-  "$DOCKER_BIN" rm "$DB_CONTAINER_NAME" 2>/dev/null || true
-
   export IMAGE
   export APP_PULL_POLICY="${APP_PULL_POLICY:-always}"
 
   echo "Using Docker Compose command: ${compose_cmd[*]}"
-  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" down --remove-orphans
-  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" pull
-  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" up -d --force-recreate --remove-orphans
+
+  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" pull app
+  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" up -d db
+
+  "$DOCKER_BIN" stop "$CONTAINER_NAME" 2>/dev/null || true
+  "$DOCKER_BIN" rm "$CONTAINER_NAME" 2>/dev/null || true
+
+  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" up -d --no-deps --force-recreate app
+
+  if [[ -n "$REQUESTED_SHA" ]]; then
+    for _ in {1..30}; do
+      if curl --fail --silent http://127.0.0.1:8181/login | grep -q "$REQUESTED_SHA"; then
+        return
+      fi
+      sleep 2
+    done
+
+    echo "Application did not expose deployref $REQUESTED_SHA after deployment" >&2
+    "$DOCKER_BIN" logs "$CONTAINER_NAME" 2>/dev/null || true
+    exit 1
+  fi
+
   "$DOCKER_BIN" image prune -af >/dev/null 2>&1 || true
 }
 

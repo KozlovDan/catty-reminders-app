@@ -61,6 +61,30 @@ jobs:
           build-args: |
             DEPLOY_REF=${{ steps.deploy.outputs.sha }}
 
+      - name: Prepare remote directory
+        uses: appleboy/ssh-action@v1
+        with:
+          host: course.prafdin.ru
+          port: 3147
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            APP_DIR="${{ secrets.APP_DIR }}"
+            if [ -z "$APP_DIR" ]; then
+              APP_DIR="$HOME/catty-reminders-app"
+            fi
+            mkdir -p "$APP_DIR/scripts"
+
+      - name: Sync deployment files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: course.prafdin.ru
+          port: 3147
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "docker-compose.yaml,scripts/deploy.sh"
+          target: ${{ secrets.APP_DIR }}
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -73,93 +97,11 @@ jobs:
             if [ -z "$APP_DIR" ]; then
               APP_DIR="$HOME/catty-reminders-app"
             fi
-            mkdir -p "$APP_DIR"
             cd "$APP_DIR"
-
-            cat > "$APP_DIR/docker-compose.yaml" <<'COMPOSE'
-            name: catty-reminders
-
-            services:
-              app:
-                image: ${IMAGE:-catty-reminders-app:local}
-                pull_policy: ${APP_PULL_POLICY:-missing}
-                restart: unless-stopped
-                depends_on:
-                  db:
-                    condition: service_healthy
-                ports:
-                  - "${HOST_PORT:-8181}:8181"
-                environment:
-                  STORAGE_BACKEND: mysql
-                  MYSQL_HOST: db
-                  MYSQL_PORT: 3306
-                  MYSQL_USER: ${MYSQL_USER:-catty}
-                  MYSQL_PASSWORD: ${MYSQL_PASSWORD:-catty}
-                  MYSQL_DATABASE: ${MYSQL_DATABASE:-catty_reminders}
-                networks:
-                  - catty
-
-              db:
-                image: mysql:8.4
-                restart: unless-stopped
-                environment:
-                  MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-catty_root}
-                  MYSQL_DATABASE: ${MYSQL_DATABASE:-catty_reminders}
-                  MYSQL_USER: ${MYSQL_USER:-catty}
-                  MYSQL_PASSWORD: ${MYSQL_PASSWORD:-catty}
-                healthcheck:
-                  test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]
-                  interval: 5s
-                  timeout: 3s
-                  retries: 20
-                  start_period: 20s
-                volumes:
-                  - catty_mysql_data:/var/lib/mysql
-                networks:
-                  - catty
-
-            volumes:
-              catty_mysql_data:
-
-            networks:
-              catty:
-            COMPOSE
-
-            DOCKER_BIN="$(command -v docker || true)"
-            if [ -z "$DOCKER_BIN" ] && [ -x /opt/homebrew/bin/docker ]; then
-              DOCKER_BIN="/opt/homebrew/bin/docker"
-            fi
-            if [ -z "$DOCKER_BIN" ] && [ -x /usr/local/bin/docker ]; then
-              DOCKER_BIN="/usr/local/bin/docker"
-            fi
-            if [ -z "$DOCKER_BIN" ]; then
-              echo "docker command not found" >&2
-              exit 1
-            fi
-
-            export PATH="$(dirname "$DOCKER_BIN"):$PATH"
-            export DOCKER_CONFIG="${DOCKER_CONFIG:-/tmp/catty-docker-config}"
-            mkdir -p "$DOCKER_CONFIG"
-
-            echo "${{ github.token }}" | "$DOCKER_BIN" login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-            if "$DOCKER_BIN" compose version >/dev/null 2>&1; then
-              COMPOSE_CMD="$DOCKER_BIN compose"
-            elif command -v docker-compose >/dev/null 2>&1; then
-              COMPOSE_CMD="$(command -v docker-compose)"
-            elif [ -x /opt/homebrew/bin/docker-compose ]; then
-              COMPOSE_CMD="/opt/homebrew/bin/docker-compose"
-            elif [ -x /usr/local/bin/docker-compose ]; then
-              COMPOSE_CMD="/usr/local/bin/docker-compose"
-            else
-              echo "docker compose command not found" >&2
-              exit 1
-            fi
-
-            export IMAGE="${{ steps.image.outputs.name }}:${{ steps.deploy.outputs.sha }}"
-            export APP_PULL_POLICY=always
-
-            $COMPOSE_CMD -f "$APP_DIR/docker-compose.yaml" --project-name catty-reminders down --remove-orphans
-            $COMPOSE_CMD -f "$APP_DIR/docker-compose.yaml" --project-name catty-reminders pull
-            $COMPOSE_CMD -f "$APP_DIR/docker-compose.yaml" --project-name catty-reminders up -d --force-recreate --remove-orphans
-            "$DOCKER_BIN" image prune -af >/dev/null 2>&1 || true
+            chmod +x scripts/deploy.sh
+            IMAGE="${{ steps.image.outputs.name }}:${{ steps.deploy.outputs.sha }}" \
+            GITHUB_ACTOR="${{ github.actor }}" \
+            GITHUB_TOKEN="${{ github.token }}" \
+            APP_DIR="$PWD" \
+            COMPOSE_PROJECT_NAME=catty \
+            ./scripts/deploy.sh lab4 "${{ steps.deploy.outputs.sha }}"
