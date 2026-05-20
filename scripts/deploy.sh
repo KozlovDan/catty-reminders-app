@@ -75,7 +75,10 @@ run_compose_deploy() {
   echo "Using Docker Compose command: ${compose_cmd[*]}"
 
   "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" pull app
-  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" up -d db
+  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" up -d db || true
+
+  "$DOCKER_BIN" network create "${COMPOSE_PROJECT_NAME}_default" 2>/dev/null || true
+  "$DOCKER_BIN" network connect --alias db "${COMPOSE_PROJECT_NAME}_default" catty-db 2>/dev/null || true
 
   "$DOCKER_BIN" stop "$CONTAINER_NAME" 2>/dev/null || true
   "$DOCKER_BIN" rm "$CONTAINER_NAME" 2>/dev/null || true
