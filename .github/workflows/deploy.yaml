@@ -16,12 +16,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.release.target_commitish }}
-
-      - name: Resolve deploy commit
-        id: deploy
-        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -57,9 +51,9 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.image.outputs.name }}:${{ steps.deploy.outputs.sha }}
+          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
           build-args: |
-            DEPLOY_REF=${{ steps.deploy.outputs.sha }}
+            DEPLOY_REF=${{ github.sha }}
 
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
@@ -157,7 +151,7 @@ jobs:
 
             echo "${{ github.token }}" | "$DOCKER_BIN" login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            export IMAGE="${{ steps.image.outputs.name }}:${{ steps.deploy.outputs.sha }}"
+            export IMAGE="${{ steps.image.outputs.name }}:${{ github.sha }}"
             export APP_PULL_POLICY=always
 
             "$DOCKER_BIN" pull "$IMAGE"
@@ -203,7 +197,7 @@ jobs:
               "$IMAGE"
 
             for i in $(seq 1 30); do
-              if curl --fail --silent http://127.0.0.1:8181/login | grep -q "${{ steps.deploy.outputs.sha }}"; then
+              if curl --fail --silent http://127.0.0.1:8181/login | grep -q "${{ github.sha }}"; then
                 exit 0
               fi
               sleep 2
