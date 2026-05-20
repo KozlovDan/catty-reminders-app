@@ -160,16 +160,47 @@ jobs:
             export IMAGE="${{ steps.image.outputs.name }}:${{ steps.deploy.outputs.sha }}"
             export APP_PULL_POLICY=always
 
-            compose -f docker-compose.yaml --project-name catty pull app
+            "$DOCKER_BIN" pull "$IMAGE"
             compose -f docker-compose.yaml --project-name catty up -d db || true
 
             "$DOCKER_BIN" network create catty_default 2>/dev/null || true
+            "$DOCKER_BIN" start catty-db 2>/dev/null || true
             "$DOCKER_BIN" network connect --alias db catty_default catty-db 2>/dev/null || true
 
             "$DOCKER_BIN" stop catty-reminders-app 2>/dev/null || true
             "$DOCKER_BIN" rm catty-reminders-app 2>/dev/null || true
 
-            compose -f docker-compose.yaml --project-name catty up -d --no-deps --force-recreate app
+            for container_id in $("$DOCKER_BIN" ps -q --filter publish=8181); do
+              "$DOCKER_BIN" stop "$container_id" || true
+            done
+
+            if command -v lsof >/dev/null 2>&1; then
+              for pid in $(lsof -ti tcp:8181 -sTCP:LISTEN 2>/dev/null || true); do
+                kill "$pid" 2>/dev/null || true
+              done
+              sleep 2
+              for pid in $(lsof -ti tcp:8181 -sTCP:LISTEN 2>/dev/null || true); do
+                kill -9 "$pid" 2>/dev/null || true
+              done
+            fi
+
+            "$DOCKER_BIN" run -d \
+              --name catty-reminders-app \
+              --restart unless-stopped \
+              --network catty_default \
+              -p 8181:8181 \
+              -e STORAGE_BACKEND=mysql \
+              -e MYSQL_HOST=db \
+              -e MYSQL_PORT=3306 \
+              -e MYSQL_USER=root \
+              -e MYSQL_PASSWORD=mypass \
+              -e MYSQL_DATABASE=catty_reminders \
+              -e DB_HOST=db \
+              -e DB_PORT=3306 \
+              -e DB_USER=root \
+              -e DB_PASSWORD=mypass \
+              -e DB_NAME=catty_reminders \
+              "$IMAGE"
 
             for i in $(seq 1 30); do
               if curl --fail --silent http://127.0.0.1:8181/login | grep -q "${{ steps.deploy.outputs.sha }}"; then

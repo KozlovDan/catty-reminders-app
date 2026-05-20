@@ -26,6 +26,7 @@ fi
 
 run_compose_deploy() {
   local compose_cmd=()
+  local app_network="${APP_NETWORK:-catty_default}"
 
   if [[ -z "$DOCKER_BIN" ]]; then
     DOCKER_BIN="$(command -v docker || true)"
@@ -74,16 +75,47 @@ run_compose_deploy() {
 
   echo "Using Docker Compose command: ${compose_cmd[*]}"
 
-  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" pull app
+  "$DOCKER_BIN" pull "$IMAGE"
   "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" up -d db || true
 
-  "$DOCKER_BIN" network create "${COMPOSE_PROJECT_NAME}_default" 2>/dev/null || true
-  "$DOCKER_BIN" network connect --alias db "${COMPOSE_PROJECT_NAME}_default" catty-db 2>/dev/null || true
+  "$DOCKER_BIN" network create "$app_network" 2>/dev/null || true
+  "$DOCKER_BIN" start catty-db 2>/dev/null || true
+  "$DOCKER_BIN" network connect --alias db "$app_network" catty-db 2>/dev/null || true
 
   "$DOCKER_BIN" stop "$CONTAINER_NAME" 2>/dev/null || true
   "$DOCKER_BIN" rm "$CONTAINER_NAME" 2>/dev/null || true
 
-  "${compose_cmd[@]}" -f "$COMPOSE_FILE_PATH" --project-name "$COMPOSE_PROJECT_NAME" up -d --no-deps --force-recreate app
+  for container_id in $("$DOCKER_BIN" ps -q --filter publish=8181); do
+    "$DOCKER_BIN" stop "$container_id" || true
+  done
+
+  if command -v lsof >/dev/null 2>&1; then
+    for pid in $(lsof -ti tcp:8181 -sTCP:LISTEN 2>/dev/null || true); do
+      kill "$pid" 2>/dev/null || true
+    done
+    sleep 2
+    for pid in $(lsof -ti tcp:8181 -sTCP:LISTEN 2>/dev/null || true); do
+      kill -9 "$pid" 2>/dev/null || true
+    done
+  fi
+
+  "$DOCKER_BIN" run -d \
+    --name "$CONTAINER_NAME" \
+    --restart unless-stopped \
+    --network "$app_network" \
+    -p 8181:8181 \
+    -e STORAGE_BACKEND=mysql \
+    -e MYSQL_HOST=db \
+    -e MYSQL_PORT=3306 \
+    -e MYSQL_USER=root \
+    -e MYSQL_PASSWORD=mypass \
+    -e MYSQL_DATABASE=catty_reminders \
+    -e DB_HOST=db \
+    -e DB_PORT=3306 \
+    -e DB_USER=root \
+    -e DB_PASSWORD=mypass \
+    -e DB_NAME=catty_reminders \
+    "$IMAGE"
 
   if [[ -n "$REQUESTED_SHA" ]]; then
     for _ in {1..30}; do
